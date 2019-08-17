@@ -3,7 +3,7 @@ A C implementation of C++ STL
 
 <table class="tg">
   <tr>
-    <th class="tg-c3ow">﻿number of operations</th>
+    <th class="tg-c3ow">number of key-value pairs</th>
     <th class="tg-c3ow">type</th>
     <th class="tg-c3ow">insertion time (ms)</th>
     <th class="tg-c3ow">search time (ms)</th>
