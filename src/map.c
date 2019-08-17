@@ -2,38 +2,42 @@
 #include "../include/map.h"
 #include "../include/util.h"
 #include<stdio.h>
+#include<string.h>
 
-map* newMap(compare func_comp)
+map* newMap(compare func_comp, size_t key_size, size_t value_size)
 {
 	map* Map = (map*)malloc(sizeof(map));
 	if (!Map)
 		return NULL;
 
-	Map->rbtree = rbCreate(func_comp);
+	Map->rbtree = rbCreate(func_comp, key_size, value_size);
 	if (!Map->rbtree)
 		return NULL;
 	return Map;
 }
 
-int mapInsert(map* Map, key_type key, value_type value)
+int mapInsert(map* Map, const void* key_field, const void* value_field)
 {
 	if (!Map || !Map->rbtree)
 		return MAP_NOT_INITIALIZED;
-	return RBTInsert(Map->rbtree, key, value);
+	return RBTInsert(Map->rbtree, key_field, value_field);
 }
 
-int mapEraseByKey(map * Map, key_type key)
+int mapEraseByKey(map * Map, void* key_field)
 {
 	if (!Map || !Map->rbtree)
 		return MAP_NOT_INITIALIZED;
-	return RBTDelete(Map->rbtree, key);
+	return RBTDelete(Map->rbtree, key_field);
 }
 
 int mapEraseByIter(map * Map, iterator * itr)
 {
 	if (!Map || !Map->rbtree)
 		return MAP_NOT_INITIALIZED;
-	return RBTDelete(Map->rbtree, mapGetKey(itr));
+	int status =  RBTDelete(Map->rbtree, mapGetKey(itr));
+	itr->current_element = NULL;
+	itr->current_element = mapFindNext(itr);
+	return status;
 }
 
 int mapEmpty(map * Map)
@@ -50,11 +54,11 @@ int mapSize(map * Map)
 	return 0;
 }
 
-int mapExist(map * Map, key_type key)
+int mapExist(map * Map, void* key_field)
 {
 	if (!Map && !Map->rbtree)
 		return MAP_NOT_INITIALIZED;
-	if (search(Map->rbtree->root, key, Map->rbtree->func_comp))
+	if (search(Map->rbtree->root, key_field, Map->rbtree->func_comp))
 		return SUCCESS;
 	else
 		return FIND_ERROR;
@@ -80,13 +84,13 @@ void mapDelete(map * Map)
 	}
 }
 
-value_type mapGetValueByKey(map * Map, key_type key)
+void* mapGetValueByKey(map * Map, void* key_field)
 {
 	if (Map && Map->rbtree)
 	{
-		rb_node* find = search(Map->rbtree->root, key, Map->rbtree->func_comp);
+		rb_node* find = search(Map->rbtree->root, key_field, Map->rbtree->func_comp);
 		if (find)
-			return find->value;
+			return find->value_field;
 	}
 }
 
@@ -127,29 +131,31 @@ rb_node* mapFindNext(iterator * itr)
 	return (rb_node*)itr->current_element;
 }
 
-key_type mapGetKey(iterator * itr)
+void* mapGetKey(iterator * itr)
 {
 	rb_node* current = (rb_node*)itr->current_element;
 	if (current)
-		return current->key;
+		return current->key_field;
+		
 	else
-		return mapFindNext(itr)->key;
+		return mapFindNext(itr)->key_field;
 }
 
-value_type mapGetValueByIter(iterator * itr)
+void* mapGetValueByIter(iterator * itr)
 {
 	rb_node* current = (rb_node*)itr->current_element;
 	if (current)
-		return current->value;
+		return current->value_field;
 	else
-		return mapFindNext(itr)->value;
+		return mapFindNext(itr)->value_field;
 }
 
-void mapReplaceValue(iterator * itr, value_type value)
+void mapReplaceValue(iterator * itr, void* value_field)
 {
 	map* Map = (map*)itr->pContainer;
 	rb_node* current = (rb_node*)itr->current_element;
-	current->value = value;
+	if(current->value_field)
+		memcpy(current->value_field, value_field, Map->rbtree->value_size);
 }
 
 iterator* mapNewIterator(map * Map)
@@ -170,7 +176,7 @@ void mapDeleteIterator(iterator * itr)
 		free(itr);
 }
 
-iterator* mapFind(map * Map, key_type key)
+iterator* mapFind(map * Map, void* key_field)
 {
 	iterator* itr = (iterator*)malloc(sizeof(iterator));
 	itr->findNext = mapFindNext;
@@ -178,11 +184,11 @@ iterator* mapFind(map * Map, key_type key)
 	itr->currentValue = mapGetValueByIter;
 	itr->replaceCurrentValue = mapReplaceValue;
 	itr->pContainer = Map;
-	itr->current_element = search(Map->rbtree->root, key, Map->rbtree->func_comp);
+	itr->current_element = search(Map->rbtree->root, key_field, Map->rbtree->func_comp);
 	return itr;
 }
 
-iterator* mapUpperBound(map * Map, key_type key)
+iterator* mapUpperBound(map * Map, void* key_field)
 {
 	iterator* itr = (iterator*)malloc(sizeof(iterator));
 	itr->findNext = mapFindNext;
@@ -190,12 +196,12 @@ iterator* mapUpperBound(map * Map, key_type key)
 	itr->currentValue = mapGetValueByIter;
 	itr->replaceCurrentValue = mapReplaceValue;
 	itr->pContainer = Map;
-	rb_node* current = search(Map->rbtree->root, key, Map->rbtree->func_comp);
+	rb_node* current = search(Map->rbtree->root, key_field, Map->rbtree->func_comp);
 	itr->current_element = mapSuccessor(Map, current);
 	return itr;
 }
 
-iterator* mapLowerBound(map * Map, key_type key)
+iterator* mapLowerBound(map * Map, void* key_field)
 {
 	iterator* itr = (iterator*)malloc(sizeof(iterator));
 	itr->findNext = mapFindNext;
@@ -203,7 +209,7 @@ iterator* mapLowerBound(map * Map, key_type key)
 	itr->currentValue = mapGetValueByIter;
 	itr->replaceCurrentValue = mapReplaceValue;
 	itr->pContainer = Map;
-	rb_node* current = search(Map->rbtree->root, key, Map->rbtree->func_comp);
+	rb_node* current = search(Map->rbtree->root, key_field, Map->rbtree->func_comp);
 	itr->current_element = mapPredecessor(Map, current);
 	return itr;
 }
@@ -211,7 +217,7 @@ iterator* mapLowerBound(map * Map, key_type key)
 iterator* mapIteratorNext(iterator * itr)
 {
 	rb_node* current = NULL;
-	map* Map = itr->pContainer;
+	map* Map = (map*)itr->pContainer;
 	if (itr->current_element)
 		current = search(Map->rbtree->root, mapGetKey(itr), Map->rbtree->func_comp);
 	itr->current_element = mapSuccessor(itr->pContainer, current);
@@ -221,7 +227,7 @@ iterator* mapIteratorNext(iterator * itr)
 iterator* mapIteratorPrev(iterator * itr)
 {
 	rb_node* current = NULL;
-	map* Map = itr->pContainer;
+	map* Map = (map*)itr->pContainer;
 	if (itr->current_element)
 		current = search(Map->rbtree->root, mapGetKey(itr), Map->rbtree->func_comp);
 	itr->current_element = mapPredecessor(itr->pContainer, current);

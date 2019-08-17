@@ -2,44 +2,47 @@
 #include "../include/set.h"
 #include "../include/util.h"
 
-set* newSet(compare func_comp)
+set* newSet(compare func_comp, size_t key_size)
 {
 	set* Set = (set*)malloc(sizeof(set));
 	if (!Set)
 		return NULL;
 
-	Set->rbtree = rbCreate(func_comp);
+	Set->rbtree = rbCreate(func_comp, key_size, 0);
 	if (!Set->rbtree)
 		return NULL;
 	return Set;
 }
 
-int setInsert(set* Set, key_type key)
+int setInsert(set* Set, void* key_field)
 {
 	if (!Set || !Set->rbtree)
 		return SET_NOT_INITIALIZED;
-	return RBTInsert(Set->rbtree, key, 0);
+	return RBTInsert(Set->rbtree, key_field, NULL);
 }
 
-int setEraseByKey(set * Set, key_type key)
+int setEraseByKey(set * Set, void* key_field)
 {
 	if (!Set || !Set->rbtree)
 		return SET_NOT_INITIALIZED;
-	return RBTDelete(Set->rbtree, key);
+	return RBTDelete(Set->rbtree, key_field);
 }
 
 int setEraseByIter(set * Set, iterator * itr)
 {
 	if (!Set || !Set->rbtree)
 		return SET_NOT_INITIALIZED;
-	return RBTDelete(Set->rbtree, setGetKey(itr));
+	int status = RBTDelete(Set->rbtree, setGetKey(itr));
+	itr->current_element = NULL;
+	itr->current_element = setFindNext(itr);
+	return status;
 }
 
-int setExist(set * Set, key_type key)
+int setExist(set * Set, void* key_field)
 {
 	if (!Set || !Set->rbtree)
 		return SET_NOT_INITIALIZED;
-	if (search(Set->rbtree->root, key, Set->rbtree->func_comp))
+	if (search(Set->rbtree->root, key_field, Set->rbtree->func_comp))
 		return SUCCESS;
 	else
 		return FIND_ERROR;
@@ -116,13 +119,13 @@ rb_node* setFindNext(iterator * itr)
 	return (rb_node*)itr->current_element;
 }
 
-key_type setGetKey(iterator * itr)
+void* setGetKey(iterator * itr)
 {
 	rb_node* current = (rb_node*)itr->current_element;
 	if (current)
-		return current->key;
+		return current->key_field;
 	else
-		return setFindNext(itr)->key;
+		return setFindNext(itr)->key_field;
 }
 
 iterator* setNewIterator(set * Set)
@@ -141,34 +144,34 @@ void setDeleteIterator(iterator * itr)
 		free(itr);
 }
 
-iterator* setFind(set * Set, key_type key)
+iterator* setFind(set * Set, void* key_field)
 {
 	iterator* itr = (iterator*)malloc(sizeof(iterator));
 	itr->findNext = setFindNext;
 	itr->currentKey = setGetKey;
 	itr->pContainer = Set;
-	itr->current_element = search(Set->rbtree->root, key, Set->rbtree->func_comp);
+	itr->current_element = search(Set->rbtree->root, key_field, Set->rbtree->func_comp);
 	return itr;
 }
 
-iterator* setUpperBound(set * Set, key_type key)
+iterator* setUpperBound(set * Set, void* key_field)
 {
 	iterator* itr = (iterator*)malloc(sizeof(iterator));
 	itr->findNext = setFindNext;
 	itr->currentKey = setGetKey;
 	itr->pContainer = Set;
-	rb_node* current = search(Set->rbtree->root, key, Set->rbtree->func_comp);
+	rb_node* current = search(Set->rbtree->root, key_field, Set->rbtree->func_comp);
 	itr->current_element = setSuccessor(Set, current);
 	return itr;
 }
 
-iterator* setLowerBound(set * Set, key_type key)
+iterator* setLowerBound(set * Set, void* key_field)
 {
 	iterator* itr = (iterator*)malloc(sizeof(iterator));
 	itr->findNext = setFindNext;
 	itr->currentKey = setGetKey;
 	itr->pContainer = Set;
-	rb_node* current = search(Set->rbtree->root, key, Set->rbtree->func_comp);
+	rb_node* current = search(Set->rbtree->root, key_field, Set->rbtree->func_comp);
 	itr->current_element = setPredecessor(Set, current);
 	return itr;
 }

@@ -1,5 +1,6 @@
 #include<stdio.h>
 #include<stdlib.h>
+#include<string.h>
 #include "../include/rbtree.h"
 #include "../include/util.h"
 
@@ -56,12 +57,12 @@ rb_node * BSTInsert(rb_node * root, compare func_comp, rb_node * new_node)
 	if (!root)
 		return new_node;
 
-	if (func_comp(&new_node->key, &root->key) < 0)
+	if (func_comp(new_node->key_field, root->key_field) < 0)
 	{
 		root->left = BSTInsert(root->left, func_comp, new_node);
 		root->left->parent = root;
 	}
-	else if (func_comp(&new_node->key, &root->key) > 0)
+	else if (func_comp(new_node->key_field, root->key_field) > 0)
 	{
 		root->right = BSTInsert(root->right, func_comp, new_node);
 		root->right->parent = root;
@@ -143,13 +144,25 @@ void fixViolation(rb * rbtree, rb_node * new_node)
 	rbtree->root->color = BLACK;
 }
 
-int RBTInsert(rb * rbtree, key_type key, value_type value)
+int RBTInsert(rb * rbtree, const void* key_field, const void* value_field)
 {
+	size_t key_size = rbtree->key_size, value_size = rbtree->value_size;
 	rb_node* new_node = (rb_node*)malloc(sizeof(rb_node));
 	if (!new_node)
 		return MEMORY_ERROR;
-	new_node->key = key;
-	new_node->value = value;
+	new_node->key_field = malloc(key_size);
+	if(!new_node->key_field)
+		return MEMORY_ERROR;
+	memcpy(new_node->key_field, key_field, key_size);
+	if (value_size != 0)
+	{
+		new_node->value_field = malloc(value_size);
+		if (!new_node->value_field)
+			return MEMORY_ERROR;
+		memcpy(new_node->value_field, value_field, value_size);
+	}
+	else
+		new_node->value_field = NULL;
 	new_node->parent = new_node->left = new_node->right = NULL;
 	new_node->color = RED;
 	rbtree->root = BSTInsert(rbtree->root, rbtree->func_comp, new_node);
@@ -157,14 +170,14 @@ int RBTInsert(rb * rbtree, key_type key, value_type value)
 	return SUCCESS;
 }
 
-rb_node* search(rb_node * root, key_type data, compare func_comp)
+rb_node* search(rb_node * root, void* data, compare func_comp)
 {
 	rb_node* temp = root;
 	while (temp)
 	{
-		if (func_comp(&data, &temp->key) < 0)
+		if (func_comp(data, temp->key_field) < 0)
 			temp = temp->left;
-		else if (func_comp(&data, &temp->key) == 0)
+		else if (func_comp(data, temp->key_field) == 0)
 			break;
 		else
 			temp = temp->right;
@@ -176,10 +189,12 @@ rb_node* search(rb_node * root, key_type data, compare func_comp)
 rb_node* findReplaceNode(rb_node * node)
 {
 	if (node->left && node->right)
-		if (node->right->left)
-			return node->right->left;
-		else
-			return node->right;
+	{
+		rb_node * temp = node->right;
+		while (temp->left)
+			temp = temp->left;
+		return temp;
+	}
 
 	if (!node->left && !node->right)
 		return NULL;
@@ -299,6 +314,9 @@ void deleteNode(rb * rbtree, rb_node * delete_node)
 			else
 				parent->right = NULL;
 		}
+		free(delete_node->key_field);
+		if(delete_node->value_field)
+			free(delete_node->value_field);
 		free(delete_node);
 		return;
 	}
@@ -307,9 +325,12 @@ void deleteNode(rb * rbtree, rb_node * delete_node)
 	{
 		if (delete_node == root)
 		{
-			delete_node->key = replace_node->key;
-			delete_node->value = replace_node->value;
+			memcpy(delete_node->key_field, replace_node->key_field, rbtree->key_size);
+			memcpy(delete_node->value_field, replace_node->value_field, rbtree->value_size);
 			delete_node->left = delete_node->right = NULL;
+			free(replace_node->key_field);
+			if (replace_node->value_field)
+				free(replace_node->value_field);
 			free(replace_node);
 		}
 		else
@@ -319,6 +340,9 @@ void deleteNode(rb * rbtree, rb_node * delete_node)
 				parent->left = replace_node;
 			else
 				parent->right = replace_node;
+			free(delete_node->key_field);
+			if (delete_node->value_field)
+				free(delete_node->value_field);
 			free(delete_node);
 			replace_node->parent = parent;
 			if (is_double_black)
@@ -329,16 +353,16 @@ void deleteNode(rb * rbtree, rb_node * delete_node)
 		return;
 	}
 
-	int temp_value = delete_node->value;
-	delete_node->value = replace_node->value;
-	replace_node->value = temp_value;
-	int temp_key = delete_node->key;
-	delete_node->key = replace_node->key;
-	replace_node->key = temp_key;
+	void* temp_value = delete_node->value_field;
+	delete_node->value_field = replace_node->value_field;
+	replace_node->value_field = temp_value;
+	void* temp_key = delete_node->key_field;
+	delete_node->key_field = replace_node->key_field;
+	replace_node->key_field = temp_key;
 	deleteNode(rbtree, replace_node);
 }
 
-int RBTDelete(rb * rbtree, key_type data)
+int RBTDelete(rb * rbtree, void* data)
 {
 	rb_node* delete_node = search(rbtree->root, data, rbtree->func_comp);
 	if (delete_node)
@@ -349,7 +373,7 @@ int RBTDelete(rb * rbtree, key_type data)
 	return FIND_ERROR;
 }
 
-rb* rbCreate(compare func_comp)
+rb* rbCreate(compare func_comp, size_t key_size, size_t value_size)
 {
 	rb* rbtree = (rb*)malloc(sizeof(rb));
 	if (rbtree == NULL) {
@@ -357,6 +381,8 @@ rb* rbCreate(compare func_comp)
 	}
 
 	rbtree->func_comp = func_comp;
+	rbtree->key_size = key_size;
+	rbtree->value_size = value_size;
 	rbtree->root = NULL;
 	return rbtree;
 }
@@ -367,6 +393,9 @@ void RBTClear(rb_node * root)
 	{
 		RBTClear(root->left);
 		RBTClear(root->right);
+		free(root->key_field);
+		if(root->value_field)
+			free(root->value_field);
 		free(root);
 	}
 }
@@ -449,11 +478,15 @@ void print(rb_node * root, int times)
 {
 	if (!root)
 		return;
+
 	print(root->right, times + 1);
 	int i;
 	for (i = 0; i < times; i++)
 		printf("          ");
-	printf("%d,%d(%d)\n", root->key, root->value, root->color);
+	if(root->value_field)
+		printf("%d,%d(%d)\n", *(int*)root->key_field, *(int*)root->value_field, root->color);
+	else
+		printf("%d(%d)\n", *(int*)root->key_field, root->color);
 	print(root->left, times + 1);
 }
 /*

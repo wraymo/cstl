@@ -8,11 +8,9 @@
 #define FIND_ERROR 4
 
 typedef int  (*compare)(const void*, const void*);
-typedef int key_type;
-typedef int value_type;
 typedef struct iterator {
 	const void* (*findNext)(struct iterator* pIterator);
-	void (*replaceCurrentValue)(struct iterator* pIterator, value_type new_value, size_t size);
+	void (*replaceCurrentValue)(struct iterator* pIterator, void* new_value, size_t size);
 	const void* (*currentKey)(struct iterator* pIterator);
 	const void* (*currentValue)(struct iterator* pIterator);
 	void* pContainer;
